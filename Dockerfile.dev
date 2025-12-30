@@ -1,0 +1,22 @@
+FROM golang:1.23
+
+# Install dependencies
+RUN apt-get update && apt-get install -y curl git build-essential
+
+# Install Node.js 22.x
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+RUN apt-get install -y nodejs
+
+# Install Yarn
+RUN npm install -g yarn
+
+# Install Air via script
+RUN curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+
+WORKDIR /app
+
+ENV CGO_ENABLED=1
+
+EXPOSE 9999 9998
+
+CMD ["yarn", "dev"]
