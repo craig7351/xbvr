@@ -410,6 +410,18 @@ func ScrapeJAVR(queryString string, scraper string) {
 		if len(collectedScenes) > 0 {
 			db, _ := models.GetDB()
 			for i := range collectedScenes {
+				// Ensure SceneID exists in Filenames list to help with file matching
+				found := false
+				for _, f := range collectedScenes[i].Filenames {
+					if f == collectedScenes[i].SceneID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					collectedScenes[i].Filenames = append(collectedScenes[i].Filenames, collectedScenes[i].SceneID)
+				}
+
 				models.SceneCreateUpdateFromExternal(db, collectedScenes[i])
 			}
 			db.Close()
