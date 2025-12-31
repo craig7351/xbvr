@@ -411,28 +411,7 @@ func ScrapeJAVR(queryString string, scraper string) {
 		if len(collectedScenes) > 0 {
 			db, _ := models.GetDB()
 			for i := range collectedScenes {
-				// Ensure multiple variations of SceneID exist in Filenames list to help with file matching
-				candidates := []string{
-					collectedScenes[i].SceneID,
-					strings.ReplaceAll(collectedScenes[i].SceneID, "-", ""),
-					strings.ToLower(collectedScenes[i].SceneID),
-					strings.ToLower(strings.ReplaceAll(collectedScenes[i].SceneID, "-", "")),
-				}
-
-				for _, candidate := range candidates {
-					found := false
-					for _, f := range collectedScenes[i].Filenames {
-						if f == candidate {
-							found = true
-							break
-						}
-					}
-					if !found {
-						tlog.Infof("Adding filename candidate: %s for scene %s", candidate, collectedScenes[i].SceneID)
-						collectedScenes[i].Filenames = append(collectedScenes[i].Filenames, candidate)
-					}
-				}
-
+				collectedScenes[i].QueryID = queryString
 				models.SceneCreateUpdateFromExternal(db, collectedScenes[i])
 			}
 			db.Close()

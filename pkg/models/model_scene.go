@@ -563,6 +563,37 @@ func (o *Scene) PopulateSceneFieldsFromExternal(db *gorm.DB, ext ScrapedScene) {
 		}
 	}
 
+	// Ensure multiple variations of SceneID and QueryID exist in Filenames list to help with file matching
+	candidates := []string{
+		ext.SceneID,
+		strings.ReplaceAll(ext.SceneID, "-", ""),
+		strings.ToLower(ext.SceneID),
+		strings.ToLower(strings.ReplaceAll(ext.SceneID, "-", "")),
+	}
+
+	if ext.QueryID != "" {
+		candidates = append(candidates, ext.QueryID)
+		candidates = append(candidates, strings.ReplaceAll(ext.QueryID, "-", ""))
+		candidates = append(candidates, strings.ToLower(ext.QueryID))
+		candidates = append(candidates, strings.ToLower(strings.ReplaceAll(ext.QueryID, "-", "")))
+	}
+
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		found := false
+		for _, f := range ext.Filenames {
+			if f == candidate {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ext.Filenames = append(ext.Filenames, candidate)
+		}
+	}
+
 	// Store filenames as JSON
 	pfTxt, err := json.Marshal(ext.Filenames)
 	if err == nil {
