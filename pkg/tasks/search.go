@@ -3,6 +3,7 @@ package tasks
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -263,4 +264,85 @@ func IndexScrapedScenes(scrapedScenes *[]models.ScrapedScene) {
 
 	// Now update search index
 	IndexScenes(&scenes)
+}
+
+func CleanFilename(filename string) string {
+	commonWords := []string{
+		"180", "180x180", "2880x1440", "3d", "3dh", "3dv", "30fps", "30m", "360",
+		"3840x1920", "4k", "5k", "5400x2700", "60fps", "6k", "7k", "7680x3840",
+		"8k", "fb360", "fisheye190", "funscript", "cmscript", "h264", "h265", "hevc", "hq", "hsp", "lq", "lr",
+		"mkv", "mkx200", "mkx220", "mono", "mp4", "oculus", "oculus5k",
+		"oculusrift", "original", "rf52", "smartphone", "srt", "ssa", "tb", "uhq", "vrca220", "vp9",
+	}
+
+	// Remove extension
+	ext := filepath.Ext(filename)
+	name := strings.TrimSuffix(filename, ext)
+
+	// Replace characters with spaces
+	re := regexp.MustCompile(`[._+-]`)
+	name = re.ReplaceAllString(name, " ")
+
+	// Replace multiple spaces
+	re = regexp.MustCompile(`\s+`)
+	name = re.ReplaceAllString(name, " ")
+	name = strings.TrimSpace(name)
+
+	// Filter common words
+	parts := strings.Split(name, " ")
+	var filtered []string
+	resP := regexp.MustCompile(`^[0-9]+p$`)
+	for _, p := range parts {
+		isCommon := false
+		for _, cw := range commonWords {
+			if strings.EqualFold(p, cw) {
+				isCommon = true
+				break
+			}
+		}
+		if !isCommon && !resP.MatchString(strings.ToLower(p)) {
+			filtered = append(filtered, p)
+		}
+	}
+
+	result := strings.Join(filtered, " ")
+	result = strings.ReplaceAll(result, " s ", "'s ")
+
+	return result
+}
+
+func FuzzySearchScenes(q string) []models.Scene {
+	db, _ := models.GetDB()
+	defer db.Close()
+
+	idx, err := NewIndex("scenes")
+	if err != nil {
+		return nil
+	}
+	defer idx.Bleve.Close()
+
+	query := bleve.NewQueryStringQuery(q)
+	searchRequest := bleve.NewSearchRequest(query)
+	searchRequest.Fields = []string{"Id", "title", "cast", "site", "description"}
+	searchRequest.Size = 25
+	searchRequest.SortBy([]string{"-_score"})
+
+	searchResults, err := idx.Bleve.Search(searchRequest)
+	if err != nil {
+		return nil
+	}
+
+	var scenes []models.Scene
+	for _, v := range searchResults.Hits {
+		var scene models.Scene
+		err := scene.GetIfExist(v.ID)
+		if err != nil {
+			continue
+		}
+
+		scene.Score = v.Score
+		scenes = append(scenes, scene)
+	}
+
+	return scenes
 }
