@@ -380,12 +380,13 @@ func Scrape(toScrape string, singleSceneURL string, singeScrapeAdditionalInfo st
 }
 
 func ScrapeJAVR(queryString string, scraper string) {
+	tlog := log.WithField("task", "scrape")
+	tlog.Infof("ScrapeJAVR called with query: %s, scraper: %s", queryString, scraper)
+
 	if !models.CheckLock("scrape") {
 		models.CreateLock("scrape")
 		defer models.RemoveLock("scrape")
 		t0 := time.Now()
-		tlog := log.WithField("task", "scrape")
-		tlog.Infof("Scraping started at %s", t0.Format("Mon Jan _2 15:04:05 2006"))
 
 		config.Config.ScraperSettings.Javr.JavrScraper = scraper
 		config.SaveConfig()
@@ -410,21 +411,33 @@ func ScrapeJAVR(queryString string, scraper string) {
 		if len(collectedScenes) > 0 {
 			db, _ := models.GetDB()
 			for i := range collectedScenes {
-				// Ensure SceneID exists in Filenames list to help with file matching
-				found := false
-				for _, f := range collectedScenes[i].Filenames {
-					if f == collectedScenes[i].SceneID {
-						found = true
-						break
-					}
+				// Ensure multiple variations of SceneID exist in Filenames list to help with file matching
+				candidates := []string{
+					collectedScenes[i].SceneID,
+					strings.ReplaceAll(collectedScenes[i].SceneID, "-", ""),
+					strings.ToLower(collectedScenes[i].SceneID),
+					strings.ToLower(strings.ReplaceAll(collectedScenes[i].SceneID, "-", "")),
 				}
-				if !found {
-					collectedScenes[i].Filenames = append(collectedScenes[i].Filenames, collectedScenes[i].SceneID)
+
+				for _, candidate := range candidates {
+					found := false
+					for _, f := range collectedScenes[i].Filenames {
+						if f == candidate {
+							found = true
+							break
+						}
+					}
+					if !found {
+						tlog.Infof("Adding filename candidate: %s for scene %s", candidate, collectedScenes[i].SceneID)
+						collectedScenes[i].Filenames = append(collectedScenes[i].Filenames, candidate)
+					}
 				}
 
 				models.SceneCreateUpdateFromExternal(db, collectedScenes[i])
 			}
 			db.Close()
+
+			tlog.Infof("Completed JAVR scrape for %d scenes", len(collectedScenes))
 
 			tlog.Infof("Updating tag counts")
 			CountTags()
