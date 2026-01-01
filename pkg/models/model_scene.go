@@ -576,6 +576,20 @@ func (o *Scene) PopulateSceneFieldsFromExternal(db *gorm.DB, ext ScrapedScene) {
 		candidates = append(candidates, strings.ReplaceAll(ext.QueryID, "-", ""))
 		candidates = append(candidates, strings.ToLower(ext.QueryID))
 		candidates = append(candidates, strings.ToLower(strings.ReplaceAll(ext.QueryID, "-", "")))
+
+		// JAVR Zero-padding rule: e.g., SAVR-883 -> SAVR00883
+		if strings.Contains(ext.QueryID, "-") {
+			parts := strings.Split(ext.QueryID, "-")
+			if len(parts) >= 2 {
+				prefix := strings.Join(parts[:len(parts)-1], "")
+				numPart := parts[len(parts)-1]
+				if num, err := strconv.Atoi(numPart); err == nil {
+					padded := fmt.Sprintf("%s%05d", prefix, num)
+					candidates = append(candidates, padded)
+					candidates = append(candidates, strings.ToLower(padded))
+				}
+			}
+		}
 	}
 
 	for _, candidate := range candidates {
