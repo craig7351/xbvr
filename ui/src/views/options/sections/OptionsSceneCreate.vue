@@ -12,7 +12,7 @@
               <option value="javlibrary">javlibrary.com</option>
               <option value="javland">jav.land</option>
             </b-select>
-            <b-input v-model="javrQuery" placeholder="ID (xxxx-001)" type="search"></b-input>
+            <b-input v-model="javrQuery" placeholder="ID (xxxx-001, xxxx-002)" type="search"></b-input>
             <b-button class="button is-primary" v-on:click="scrapeJAVR()">{{$t('Go')}}</b-button>
           </b-field>
           <p style="font-size: 0.75em;">

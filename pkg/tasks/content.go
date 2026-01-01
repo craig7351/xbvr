@@ -391,44 +391,54 @@ func ScrapeJAVR(queryString string, scraper string) {
 		config.Config.ScraperSettings.Javr.JavrScraper = scraper
 		config.SaveConfig()
 
-		// Start scraping
-		var collectedScenes []models.ScrapedScene
+		// Split query string by comma to support batch import
+		queries := strings.Split(queryString, ",")
 
-		if scraper == "javlibrary" {
-			tlog.Infof("Scraping JavLibrary")
-			scrape.ScrapeJavLibrary(&collectedScenes, queryString)
-		} else if scraper == "r18d" {
-			tlog.Infof("Scraping R18.dev")
-			scrape.ScrapeR18D(&collectedScenes, queryString)
-		} else if scraper == "javland" {
-			tlog.Infof("Scraping JavLand")
-			scrape.ScrapeJavLand(&collectedScenes, queryString)
-		} else {
-			tlog.Infof("Scraping JavDB")
-			scrape.ScrapeJavDB(&collectedScenes, queryString)
-		}
-
-		if len(collectedScenes) > 0 {
-			db, _ := models.GetDB()
-			for i := range collectedScenes {
-				collectedScenes[i].QueryID = queryString
-				models.SceneCreateUpdateFromExternal(db, collectedScenes[i])
+		for _, q := range queries {
+			q = strings.TrimSpace(q)
+			if q == "" {
+				continue
 			}
-			db.Close()
 
-			tlog.Infof("Completed JAVR scrape for %d scenes", len(collectedScenes))
+			tlog.Infof("Scraping JAVR for: %s", q)
 
-			tlog.Infof("Updating tag counts")
-			CountTags()
-			IndexScrapedScenes(&collectedScenes)
+			// Start scraping
+			var collectedScenes []models.ScrapedScene
 
-			tlog.Infof("Scraped %v new scenes in %s",
-				len(collectedScenes),
-				time.Since(t0).Round(time.Second))
-		} else {
-			tlog.Infof("No new scenes scraped")
+			if scraper == "javlibrary" {
+				tlog.Infof("Scraping JavLibrary")
+				scrape.ScrapeJavLibrary(&collectedScenes, q)
+			} else if scraper == "r18d" {
+				tlog.Infof("Scraping R18.dev")
+				scrape.ScrapeR18D(&collectedScenes, q)
+			} else if scraper == "javland" {
+				tlog.Infof("Scraping JavLand")
+				scrape.ScrapeJavLand(&collectedScenes, q)
+			} else {
+				tlog.Infof("Scraping JavDB")
+				scrape.ScrapeJavDB(&collectedScenes, q)
+			}
+
+			if len(collectedScenes) > 0 {
+				db, _ := models.GetDB()
+				for i := range collectedScenes {
+					collectedScenes[i].QueryID = q
+					models.SceneCreateUpdateFromExternal(db, collectedScenes[i])
+				}
+				db.Close()
+
+				tlog.Infof("Completed JAVR scrape for %d scenes (query: %s)", len(collectedScenes), q)
+				IndexScrapedScenes(&collectedScenes)
+			} else {
+				tlog.Infof("No new scenes scraped for query: %s", q)
+			}
 		}
 
+		tlog.Infof("Updating tag counts")
+		CountTags()
+
+		tlog.Infof("Scraped all JAVR scenes in %s",
+			time.Since(t0).Round(time.Second))
 	}
 }
 
