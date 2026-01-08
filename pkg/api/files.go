@@ -218,7 +218,32 @@ func (i FilesResource) listFiles(req *restful.Request, resp *restful.Response) {
 
 	tx.Find(&files)
 
-	resp.WriteHeaderAndEntity(http.StatusOK, files)
+	// For unmatched files, add auto-match suggestions
+	type FileWithSuggestion struct {
+		models.File
+		SuggestedTitle string  `json:"suggested_title"`
+		SuggestedScore float64 `json:"suggested_score"`
+		SuggestedID    string  `json:"suggested_id"`
+	}
+
+	var result []FileWithSuggestion
+	for _, file := range files {
+		fws := FileWithSuggestion{File: file}
+		if file.SceneID == 0 && file.Type == "video" {
+			cleanQuery := tasks.CleanFilename(file.Filename)
+			if cleanQuery != "" {
+				fuzzyScenes := tasks.FuzzySearchScenes(cleanQuery)
+				if len(fuzzyScenes) > 0 {
+					fws.SuggestedTitle = fuzzyScenes[0].Title
+					fws.SuggestedScore = fuzzyScenes[0].Score
+					fws.SuggestedID = fuzzyScenes[0].SceneID
+				}
+			}
+		}
+		result = append(result, fws)
+	}
+
+	resp.WriteHeaderAndEntity(http.StatusOK, result)
 }
 
 func (i FilesResource) matchFile(req *restful.Request, resp *restful.Response) {

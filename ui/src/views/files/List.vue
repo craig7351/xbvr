@@ -11,6 +11,13 @@
               {{ props.row.filename }}
               <br/><small>{{ props.row.path }}</small>
             </b-table-column>
+            <b-table-column field="suggested_title" :label="$t('Auto Match')" style="max-width: 200px;" v-slot="props">
+              <span v-if="props.row.suggested_title" :title="'Score: ' + props.row.suggested_score.toFixed(2)">
+                {{ props.row.suggested_title }}
+                <br/><small>{{ props.row.suggested_score.toFixed(2) }}</small>
+              </span>
+              <span v-else>-</span>
+            </b-table-column>
             <b-table-column field="created_time" :label="$t('Created')" style="white-space: nowrap;" sortable
                             v-slot="props">
               {{ format(parseISO(props.row.created_time), "yyyy-MM-dd hh:mm:ss") }}
