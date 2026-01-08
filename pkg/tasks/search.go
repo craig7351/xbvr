@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -307,6 +308,32 @@ func CleanFilename(filename string) string {
 
 	result := strings.Join(filtered, " ")
 	result = strings.ReplaceAll(result, " s ", "'s ")
+
+	// Detect JAVR-style patterns like "PXVR 258" or "SAVR 883" and add variations
+	javrPattern := regexp.MustCompile(`([a-zA-Z]+)\s+([0-9]+)`)
+	matches := javrPattern.FindAllStringSubmatch(result, -1)
+
+	for _, match := range matches {
+		if len(match) == 3 {
+			prefix := match[1]
+			numStr := match[2]
+
+			// Add zero-padded version (e.g., PXVR00258)
+			num, err := strconv.Atoi(numStr)
+			if err == nil {
+				padded := fmt.Sprintf("%s%05d", prefix, num)
+				if !strings.Contains(result, padded) {
+					result = result + " " + padded
+				}
+			}
+
+			// Add simple concatenated version (e.g., PXVR258)
+			simple := prefix + numStr
+			if !strings.Contains(result, simple) {
+				result = result + " " + simple
+			}
+		}
+	}
 
 	return result
 }
