@@ -149,11 +149,38 @@ export default {
       const isNotCommonWord = word => !commonWords.includes(word.toLowerCase()) && !/^[0-9]+p$/.test(word)
 
       this.data = []
-      this.queryString = (
+      let cleanedName = (
         this.file.filename
           .replace(/\.|_|\+|-/g, ' ').replace(/\s+/g, ' ').trim()
           .split(' ').filter(isNotCommonWord).join(' ')
           .replace(/ s /g, '\'s '))
+
+      // Detect JAVR-style patterns like "PXVR 258" or "SAVR 883" and add variations
+      const javrPattern = /([A-Za-z]+)\s+(\d+)/g
+      let match
+      const variations = []
+      while ((match = javrPattern.exec(cleanedName)) !== null) {
+        const prefix = match[1]
+        const num = match[2]
+        // Add zero-padded version (e.g., PXVR00258)
+        const padded = prefix + num.padStart(5, '0')
+        // Add simple concatenated version (e.g., PXVR258)
+        const simple = prefix + num
+        if (!cleanedName.includes(padded)) {
+          variations.push(padded)
+        }
+        if (!cleanedName.includes(simple)) {
+          variations.push(simple)
+        }
+      }
+
+      // Append variations to the query string
+      if (variations.length > 0) {
+        this.queryString = cleanedName + ' ' + variations.join(' ')
+      } else {
+        this.queryString = cleanedName
+      }
+
       this.loadData()
     },
     loadData: async function loadData () {
