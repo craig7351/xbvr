@@ -23,6 +23,10 @@
             <button class="button is-light" @click="clearFilename">
               <b-icon pack="fas" icon="times" size="is-small"></b-icon>
             </button>
+            <button class="button is-primary" @click="autoMatch" :disabled="isAutoMatching">
+              <b-icon pack="fas" icon="magic" size="is-small"></b-icon>
+              <span>Auto Match</span>
+            </button>
           </b-field>
         </div>
         <div class="column is-one-fifth">
@@ -116,9 +120,18 @@
 
 <script>
 import { subDays } from 'date-fns'
+import ky from 'ky'
 
 export default {
   name: 'Filters',
+  data () {
+    return {
+      isAutoMatching: false
+    }
+  },
+  mounted () {
+    console.log('[Filters.vue] Component mounted - Auto Match button should be visible v2')
+  },
   methods: {
     clearFilename () {
       this.fileName = ''
@@ -128,6 +141,28 @@ export default {
     },
     setRange (start, end) {
       this.fileCreation = [start, end]
+    },
+    autoMatch () {
+      this.isAutoMatching = true
+      ky.post('/api/files/auto-match', { json: {} })
+        .json()
+        .then(data => {
+          const matchedCount = data.filter(r => r.matched).length
+          this.$buefy.toast.open({
+            message: `Auto-matched ${matchedCount} of ${data.length} files`,
+            type: 'is-success'
+          })
+          this.$store.dispatch('files/load')
+        })
+        .catch(err => {
+          this.$buefy.toast.open({
+            message: 'Auto-match failed: ' + err.message,
+            type: 'is-danger'
+          })
+        })
+        .finally(() => {
+          this.isAutoMatching = false
+        })
     },
     subDays
   },

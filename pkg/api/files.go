@@ -16,6 +16,7 @@ import (
 	"github.com/emicklei/go-restful/v3"
 	"github.com/markphelps/optional"
 	"github.com/xbapps/xbvr/pkg/models"
+	"github.com/xbapps/xbvr/pkg/tasks"
 )
 
 type RequestMatchFile struct {
@@ -63,6 +64,9 @@ func (i FilesResource) WebService() *restful.WebService {
 		Writes(models.File{}))
 
 	ws.Route(ws.DELETE("/file/{file-id}").To(i.removeFile).
+		Metadata(restfulspec.KeyOpenAPITags, tags))
+
+	ws.Route(ws.POST("/auto-match").To(i.autoMatchFiles).
 		Metadata(restfulspec.KeyOpenAPITags, tags))
 
 	return ws
@@ -379,4 +383,50 @@ func removeFileByFileId(fileId uint) models.Scene {
 		log.Errorf("error deleting file %v", err)
 	}
 	return scene
+}
+
+type AutoMatchResult struct {
+	FileID   uint    `json:"file_id"`
+	Filename string  `json:"filename"`
+	SceneID  string  `json:"scene_id"`
+	Score    float64 `json:"score"`
+	Matched  bool    `json:"matched"`
+}
+
+func (i FilesResource) autoMatchFiles(req *restful.Request, resp *restful.Response) {
+	db, _ := models.GetDB()
+	defer db.Close()
+
+	var files []models.File
+	db.Where("scene_id = ?", 0).Where("type = ?", "video").Find(&files)
+
+	var results []AutoMatchResult
+
+	for _, file := range files {
+		result := AutoMatchResult{
+			FileID:   file.ID,
+			Filename: file.Filename,
+			Matched:  false,
+		}
+
+		cleanQuery := tasks.CleanFilename(file.Filename)
+		if cleanQuery != "" {
+			fuzzyScenes := tasks.FuzzySearchScenes(cleanQuery)
+			if len(fuzzyScenes) > 0 {
+				file.SceneID = fuzzyScenes[0].ID
+				file.Save()
+				fuzzyScenes[0].UpdateStatus()
+
+				result.SceneID = fuzzyScenes[0].SceneID
+				result.Score = fuzzyScenes[0].Score
+				result.Matched = true
+
+				log.Infof("Auto-matched file %s to scene %s (Score: %f)", file.Filename, fuzzyScenes[0].SceneID, fuzzyScenes[0].Score)
+			}
+		}
+
+		results = append(results, result)
+	}
+
+	resp.WriteHeaderAndEntity(http.StatusOK, results)
 }

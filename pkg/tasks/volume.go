@@ -119,19 +119,7 @@ func RescanVolumes(id int) {
 				files[i].Save()
 				scenes[0].UpdateStatus()
 			} else {
-				// Automatic fuzzy matching
-				cleanQuery := CleanFilename(unescapedFilename)
-				if cleanQuery != "" {
-					fuzzyScenes := FuzzySearchScenes(cleanQuery)
-					if len(fuzzyScenes) > 0 {
-						files[i].SceneID = fuzzyScenes[0].ID
-						files[i].Save()
-						fuzzyScenes[0].UpdateStatus()
-						tlog.Infof("File %s automatically matched to Scene %s (Score: %f)", unescapedFilename, fuzzyScenes[0].SceneID, fuzzyScenes[0].Score)
-					}
-				}
-
-				if files[i].SceneID == 0 && config.Config.Storage.MatchOhash && config.Config.Advanced.StashApiKey != "" {
+				if config.Config.Storage.MatchOhash && config.Config.Advanced.StashApiKey != "" {
 					hash := files[i].OsHash
 					if len(hash) < 16 {
 						// the has in xbvr is sometiomes < 16 pad with zeros
